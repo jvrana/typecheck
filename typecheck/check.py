@@ -25,8 +25,8 @@ P3 = ParamSpec("P", bound=bool)
 R = TypeVar("R")
 Types = Union[Type, Tuple[Type, ...]]
 
-ExceptionType: TypeAlias = TypeVar("ExceptionType", bound=Exception)
-WarningType: TypeAlias = TypeVar("WarningType", bound=Warning)
+ExceptionType: TypeAlias = TypeVar("ExceptionType", bound=Type[Exception])
+WarningType: TypeAlias = TypeVar("WarningType", bound=Type[Warning])
 
 
 class TypeCheckError(Exception):
@@ -63,7 +63,7 @@ def is_builtin_inst(obj: Any):
     return is_builtin_type(type(obj))
 
 
-def is_typing_type(x: Types):
+def is_typing_type(x: Any) -> bool:
     return x.__class__.__module__ == typing.__name__
 
 
