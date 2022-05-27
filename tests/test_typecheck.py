@@ -1,10 +1,4 @@
-import inspect
-from typing import Callable, Any
-from functools import wraps
-from inspect import BoundArguments
-from typing import List
 import pytest
-from typing import Protocol
 import typing
 from typecheck.check import is_builtin_type, is_builtin_inst, is_typing_type, ValueChecker, ValidationResult
 
@@ -73,3 +67,34 @@ class TestValidators():
         assert not result
         assert result.msg
         assert bool(result) is False
+
+    @pytest.mark.parametrize('inst,typ', [
+        (5.0, int),
+        ('sl', float),
+        ((1,), list)
+    ])
+    def test_validate_is_not_instance_do_raise(self, inst, typ):
+        check = ValueChecker()
+        with pytest.raises(ValueChecker.default_exception_type):
+            check.is_instance_of(inst, typ, do_raise=True)
+
+    def test_raises_custom_exception(self):
+        """Test that default exception type can be overridden on
+        ValueChecker.__init__"""
+        class CustomException(Exception):
+            ...
+        check = ValueChecker(exception_type=CustomException)
+        with pytest.raises(CustomException):
+            check.is_instance_of(5, list, do_raise=True)
+
+    def test_raises_custom_exception_override(self):
+        """Test that exception type can be overridden on method call"""
+        class CustomException(Exception):
+            ...
+
+        class CustomException2(Exception):
+            ...
+
+        check = ValueChecker(exception_type=CustomException)
+        with pytest.raises(CustomException2):
+            check.is_instance_of(5, list, do_raise=True, exception_type=CustomException2)

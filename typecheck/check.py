@@ -24,7 +24,7 @@ ExceptionType = TypeVar("ExceptionType", bound=Exception)
 
 
 class TypeCheckError(Exception):
-    ...
+    """Type Checking Error"""
 
 
 # def get_inner_type(typ: ):
@@ -75,17 +75,26 @@ def check_handler(f: Callable[P, R]) -> Callable[P, R]:
     return wrapped
 
 
+# TODO: add global config
 class ValueChecker(object):
     default_exception_type: ExceptionType = TypeCheckError
     default_do_raise: bool = False
 
-    def __init__(self):
-        self.do_raise = self.default_do_raise
-        self.exception_type = self.default_exception_type
+    def __init__(self, do_raise: bool = default_do_raise, exception_type: ExceptionType = default_exception_type):
+        self.do_raise = do_raise
+        self.exception_type = exception_type
 
     @staticmethod
     def _handle(x: ValidationResult, do_raise: bool = False,
                 exception_type: ExceptionType = default_exception_type) -> ValidationResult:
+        """
+        Handle a validation result.
+
+        :param x:
+        :param do_raise: If True, raise
+        :param exception_type:
+        :return:
+        """
         if exception_type:
             if not issubclass(exception_type, Exception):
                 raise TypeError(f'Exception type must be an Exception. Found {type(exception_type)}')
@@ -109,7 +118,7 @@ class ValueChecker(object):
                        *, extra_err_msg: Optional[str] = None,
                        do_raise: Union[bool, Type] = False,
                        exception_type: ExceptionType = default_exception_type) -> ValidationResult:
-        _, _ = do_raise, exception_type
+        _, _ = do_raise, exception_type  # purely for
         errmsg = ''
         valid = True
         if not isinstance(obj, typ):
