@@ -6,7 +6,9 @@ from typing import Union
 
 import pytest
 
+from typecheck import TypeCheckError
 from typecheck import validate_args
+from typecheck import validate_signature
 from typecheck import validate_value
 
 
@@ -24,3 +26,29 @@ def test_validate_args():
         foo({}, [1])
     with pytest.raises(Exception):
         foo({4: None}, [1])
+
+
+class TestValidateSignature:
+    def test_validate_signature_passes(self):
+        def bar(a: Dict[int, Union[None, str]], b: Union[float, List[float]]):
+            ...
+
+        @validate_signature(bar)
+        def foo(a: Dict[int, Union[None, str]], b: Union[float, List[float]]):
+            ...
+
+    def test_validate_signature_fails(self):
+        def bar(a: Dict[int, Union[None, str]], b: Union[float, List[float]]):
+            ...
+
+        with pytest.raises(TypeCheckError):
+
+            @validate_signature(bar)
+            def foo1(a: Dict[int, Union[None, str]]):
+                ...
+
+        with pytest.raises(TypeCheckError):
+
+            @validate_signature(bar)
+            def foo2(a: Dict[int, Union[None, str]], b):
+                ...

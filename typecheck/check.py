@@ -7,6 +7,8 @@ import inspect
 import sys
 import typing
 import warnings
+from inspect import Parameter
+from inspect import Signature
 from typing import Any
 from typing import Callable
 from typing import List
@@ -28,6 +30,7 @@ P2 = ParamSpec("P", bound=bool)
 P3 = ParamSpec("P", bound=bool)
 R = TypeVar("R")
 Types = Union[Type, Tuple[Type, ...]]
+SignatureLike = Union[Callable, Signature]
 
 ExceptionType: TypeAlias = TypeVar("ExceptionType", bound=Type[Exception])
 WarningType: TypeAlias = TypeVar("WarningType", bound=Type[Warning])
@@ -130,6 +133,14 @@ def check_handler(
     return wrapped
 
 
+def get_signature(obj: SignatureLike):
+    if isinstance(obj, Signature):
+        signature = obj
+    else:
+        signature = inspect.signature(obj)
+    return signature
+
+
 # TODO: add global config
 class ValueChecker:
     default_exception_type: ExceptionType = TypeCheckError
@@ -213,6 +224,33 @@ class ValueChecker:
         return ValidationResult(valid, errmsg)
 
     @check_handler
+    def same_signature(
+        self,
+        obj1: SignatureLike,
+        obj2: SignatureLike,
+        *,
+        extra_err_msg: Optional[str] = None,
+        do_raise: Union[Type[Null], bool] = Null,
+        exception_type: Union[Type[Null], ExceptionType] = Null,
+        do_warn: Union[Type[Null], bool] = Null,
+        warning_type: Union[Type[Null], WarningType] = Null,
+        _force_untrue: bool = False,
+    ):
+        _, _, _, _ = do_raise, exception_type, do_warn, warning_type
+        errmsg = f"Signature of {obj1} does not match signature of {obj2}"
+        errmsg = self._create_error_msg(errmsg, extra_err_msg)
+        if _force_untrue:
+            return ValidationResult(False, errmsg)
+
+        s1 = get_signature(obj1)
+        s2 = get_signature(obj2)
+        a = tuple(s1.parameters.values())
+        b = tuple(s2.parameters.values())
+        if not a == b:
+            return ValidationResult(False, errmsg)
+        return ValidationResult(True, "")
+
+    @check_handler
     def __call__(
         self,
         obj: Any,
@@ -233,10 +271,9 @@ class ValueChecker:
         )
         if is_typing_type(typ):
             if typ.__class__ is TypeVar:
-                return ValidationResult(True, '')
+                return ValidationResult(True, "")
             if hasattr(typ, "__origin__"):
                 outer_typ = typ.__origin__
-                d = typ.__dict__
                 if hasattr(typ, "__args__"):
                     if typ.__args__:
                         if outer_typ is list:
@@ -308,6 +345,13 @@ class ValueChecker:
             result = result.combine(inner_result)
         return result
 
+    def validate_signature(self, other: SignatureLike):
+        def wrapped(f: Callable) -> Callable:
+            self.same_signature(f, other)
+            return f
+
+        return wrapped
+
     def validate_args(self, x: Union[str, Callable], *others: str) -> Callable:
         if isinstance(x, str):
             return functools.partial(self._validate_args, only=[x, *others])
@@ -337,7 +381,10 @@ class ValueChecker:
         return wrapped
 
 
-validate_value = ValueChecker(do_raise=True)
-check_value = ValueChecker(do_raise=False)
-validate_args_checker = ValueChecker(do_raise=True)
-validate_args = validate_args_checker.validate_args
+checker = ValueChecker(do_raise=False)
+check_value = checker
+
+validator = ValueChecker(do_raise=True)
+validate_value = validator
+validate_args = validator.validate_args
+validate_signature = validator.validate_signature
