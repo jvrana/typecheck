@@ -1,3 +1,4 @@
+import inspect
 import typing
 
 import pytest
@@ -45,6 +46,20 @@ def test_is_typing_type(x):
 @pytest.mark.parametrize("x", [5, (1,), 5.0, "string"], ids=lambda x: str(x))
 def test_is_not_typing_type(x):
     assert not is_typing_type(x)
+
+
+def empty_generator():
+    return
+    yield
+
+
+def not_a_generator():
+    return
+
+
+def test_is_generator():
+    assert inspect.isgeneratorfunction(empty_generator)
+    assert not inspect.isgeneratorfunction(not_a_generator)
 
 
 class TestValidators:
@@ -117,3 +132,67 @@ class TestValidators:
             check.is_instance_of(5, list, do_warn=True)
         with pytest.warns(CustomWarning2):
             check.is_instance_of(5, list, do_warn=True, warning_type=CustomWarning2)
+
+    @pytest.mark.parametrize(
+        "inst,typ,valid",
+        [
+            ([1], typing.List, True),
+            ({}, typing.Dict, True),
+            ([1, 2, 3], typing.Dict, False),
+            ((1,), typing.Tuple, True),
+            (
+                [
+                    1,
+                ],
+                typing.Tuple,
+                False,
+            ),
+            (empty_generator(), typing.Generator, True),
+            (not_a_generator(), typing.Generator, False),
+            (not_a_generator, typing.Callable, True),
+            (dict, typing.Callable, True),
+            (5, typing.Callable, False),
+        ],
+    )
+    def test_check_outer_type(self, inst, typ, valid):
+        check = ValueChecker()
+        result = bool(check(inst, typ))
+        assert result is valid
+
+    @pytest.mark.parametrize(
+        "inst,typ,valid",
+        [
+            ([1], typing.List, True),
+            ([1], typing.List[int], True),
+            (["str"], typing.List[float], False),
+            (["str"], typing.List[str], True),
+            (["str"], typing.Tuple[str, ...], False),
+            (("str",), typing.Tuple[str, ...], True),
+            (("str", "str"), typing.Tuple[str, ...], True),
+            (("str", 1), typing.Tuple[str, ...], False),
+            ((1,), typing.Tuple[str, ...], False),
+            ({1: "str"}, typing.Dict[int, str], True),
+            ({1: "str"}, typing.Dict[int, int], False),
+        ],
+    )
+    def test_check_inner_type(self, inst, typ, valid):
+        check = ValueChecker()
+        result = check(inst, typ)
+        print(result.msg)
+        assert bool(result) is valid
+
+    @pytest.mark.parametrize(
+        "inst,typ,valid",
+        [
+            (1, typing.Union[int, str], True),
+            ("1", typing.Union[int, str], True),
+            (1.0, typing.Union[int, str], False),
+        ],
+    )
+    def test_union(self, inst, typ, valid):
+        check = ValueChecker()
+        result = check(inst, typ)
+        print(result.msg)
+        assert bool(result) is valid
+
+    # TODO: support TypedDict
