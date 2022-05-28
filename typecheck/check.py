@@ -232,8 +232,11 @@ class ValueChecker:
             warning_type=warning_type,
         )
         if is_typing_type(typ):
+            if typ.__class__ is TypeVar:
+                return ValidationResult(True, '')
             if hasattr(typ, "__origin__"):
                 outer_typ = typ.__origin__
+                d = typ.__dict__
                 if hasattr(typ, "__args__"):
                     if typ.__args__:
                         if outer_typ is list:
