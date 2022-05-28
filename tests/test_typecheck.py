@@ -187,6 +187,7 @@ class TestValidators:
             (1, typing.Union[int, str], True),
             ("1", typing.Union[int, str], True),
             (1.0, typing.Union[int, str], False),
+            ([], typing.Union[float, typing.List[float]], True),
         ],
     )
     def test_union(self, inst, typ, valid):
@@ -202,7 +203,7 @@ class TestTypeCheckWrapper:
     def test_type_check_simple(self):
         check = ValueChecker(do_raise=True)
 
-        @check.typecheck
+        @check.validate_args
         def foo(a: int):
             ...
 
@@ -213,7 +214,7 @@ class TestTypeCheckWrapper:
     def test_type_check_many(self):
         check = ValueChecker(do_raise=True)
 
-        @check.typecheck
+        @check.validate_args
         def foo(a: int, b: str, c: dict):
             ...
 
@@ -224,7 +225,7 @@ class TestTypeCheckWrapper:
     def test_type_check_only(self):
         check = ValueChecker(do_raise=True)
 
-        @check.typecheck("b")
+        @check.validate_args("b")
         def foo(a: int, b: str, c: dict):
             ...
 
@@ -236,7 +237,7 @@ class TestTypeCheckWrapper:
     def test_type_check_only_many(self):
         check = ValueChecker(do_raise=True)
 
-        @check.typecheck("b", "c")
+        @check.validate_args("b", "c")
         def foo(a: int, b: str, c: dict):
             ...
 
@@ -250,8 +251,8 @@ class TestTypeCheckWrapper:
     def test_type_check_only_many_wrappers(self):
         check = ValueChecker(do_raise=True)
 
-        @check.typecheck("b")
-        @check.typecheck("c")
+        @check.validate_args("b")
+        @check.validate_args("c")
         def foo(a: int, b: str, c: dict):
             ...
 
@@ -261,3 +262,18 @@ class TestTypeCheckWrapper:
             foo(1.0, 1, {})
         with pytest.raises(ValueChecker.default_exception_type):
             foo(1.0, "str", 1)
+
+    def test_nested(self):
+        check = ValueChecker()
+        result = check(
+            [([1.0], "str")], typing.List[typing.Tuple[typing.List[float], str]]
+        )
+        assert bool(result)
+
+        result = check([([1.0], 1)], typing.List[typing.Tuple[typing.List[float], str]])
+        assert not bool(result)
+
+        result = check(
+            [([1], "str")], typing.List[typing.Tuple[typing.List[float], str]]
+        )
+        assert not bool(result)

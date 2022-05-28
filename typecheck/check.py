@@ -210,6 +210,7 @@ class ValueChecker:
             valid = False
         return ValidationResult(valid, errmsg)
 
+    @check_handler
     def __call__(
         self,
         obj: Any,
@@ -231,21 +232,41 @@ class ValueChecker:
         if is_typing_type(typ):
             if hasattr(typ, "__origin__"):
                 outer_typ = typ.__origin__
-                result = self.is_instance_of(obj, outer_typ, **kwargs)
                 if hasattr(typ, "__args__"):
                     if typ.__args__:
                         if outer_typ is list:
-                            result = self._check_inner_list(result, obj, typ, kwargs)
+                            result = self.is_instance_of(obj, outer_typ, **kwargs)
+                            if result.valid:
+                                result = self._check_inner_list(
+                                    result, obj, typ, kwargs
+                                )
+                            return result
                         elif outer_typ is tuple:
-                            result = self._check_inner_tuple(result, obj, typ, kwargs)
+                            result = self.is_instance_of(obj, outer_typ, **kwargs)
+                            if result.valid:
+                                result = self._check_inner_tuple(
+                                    result, obj, typ, kwargs
+                                )
+                            return result
                         elif outer_typ is dict:
-                            result = self._check_inner_dict(result, obj, typ, kwargs)
+                            result = self.is_instance_of(obj, outer_typ, **kwargs)
+                            if result.valid:
+                                result = self._check_inner_dict(
+                                    result, obj, typ, kwargs
+                                )
+                            return result
                         elif outer_typ == typing.Union:
                             for inner_typ in typ.__args__:
-                                result = self(obj, inner_typ)
+                                result = self(
+                                    obj, inner_typ, do_raise=False, do_warn=False
+                                )
                                 if result.valid is True:
                                     return result
-                return result
+                            return ValidationResult(
+                                False, f"Value {obj} did not pass {typ}"
+                            )
+                else:
+                    return self.is_instance_of(obj, outer_typ, **kwargs)
         return self.is_instance_of(obj, typ, **kwargs)
 
     def _check_inner_dict(self, result, obj, typ, kwargs):
@@ -282,13 +303,13 @@ class ValueChecker:
             result = result.combine(inner_result)
         return result
 
-    def typecheck(self, x: Union[str, Callable], *others: str) -> Callable:
+    def validate_args(self, x: Union[str, Callable], *others: str) -> Callable:
         if isinstance(x, str):
-            return functools.partial(self._typecheck, only=[x, *others])
+            return functools.partial(self._validate_args, only=[x, *others])
         else:
-            return self._typecheck(x)
+            return self._validate_args(x)
 
-    def _typecheck(self, f: Callable, only=None) -> Callable:
+    def _validate_args(self, f: Callable, only=None) -> Callable:
         signature: inspect.Signature = inspect.signature(f)
         checker = self
 
@@ -309,3 +330,9 @@ class ValueChecker:
             return f(*args, **kwargs)
 
         return wrapped
+
+
+validate_value = ValueChecker(do_raise=True)
+check_value = ValueChecker(do_raise=False)
+validate_args_checker = ValueChecker(do_raise=True)
+validate_args = validate_args_checker.validate_args
