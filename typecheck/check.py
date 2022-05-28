@@ -195,10 +195,10 @@ class ValueChecker:
         typ: Types,
         *,
         extra_err_msg: Optional[str] = None,
-        do_raise: Nullable[bool] = Null,
-        exception_type: Nullable[ExceptionType] = Null,
-        do_warn: Nullable[bool] = Null,
-        warning_type: Nullable[WarningType] = Null,
+        do_raise: Union[Type[Null], bool] = Null,
+        exception_type: Union[Type[Null], ExceptionType] = Null,
+        do_warn: Union[Type[Null], bool] = Null,
+        warning_type: Union[Type[Null], WarningType] = Null,
         _force_untrue: bool = False,
     ) -> ValidationResult:
         _, _, _, _ = do_raise, exception_type, do_warn, warning_type
@@ -217,10 +217,10 @@ class ValueChecker:
         typ: Any,
         *,
         extra_err_msg: Optional[str] = None,
-        do_raise: Nullable[bool] = Null,
-        exception_type: Nullable[ExceptionType] = Null,
-        do_warn: Nullable[bool] = Null,
-        warning_type: Nullable[WarningType] = Null,
+        do_raise: Union[Type[Null], bool] = Null,
+        exception_type: Union[Type[Null], ExceptionType] = Null,
+        do_warn: Union[Type[Null], bool] = Null,
+        warning_type: Union[Type[Null], WarningType] = Null,
     ):
         kwargs = dict(
             extra_err_msg=extra_err_msg,
@@ -281,8 +281,8 @@ class ValueChecker:
 
     def _check_inner_tuple(self, result, obj, typ, kwargs):
         use_same_inner_type = False
+        inner_typ = typ.__args__[0]
         if len(typ.__args__) >= 2 and typ.__args__[1] is Ellipsis:
-            inner_typ = typ.__args__[0]
             use_same_inner_type = True
         for i, inner_obj in enumerate(obj):
             try:
