@@ -196,3 +196,68 @@ class TestValidators:
         assert bool(result) is valid
 
     # TODO: support TypedDict
+
+
+class TestTypeCheckWrapper:
+    def test_type_check_simple(self):
+        check = ValueChecker(do_raise=True)
+
+        @check.typecheck
+        def foo(a: int):
+            ...
+
+        foo(5)
+        with pytest.raises(ValueChecker.default_exception_type):
+            foo("s")
+
+    def test_type_check_many(self):
+        check = ValueChecker(do_raise=True)
+
+        @check.typecheck
+        def foo(a: int, b: str, c: dict):
+            ...
+
+        foo(5, "soething", {})
+        with pytest.raises(ValueChecker.default_exception_type):
+            foo(1.0, "", {})
+
+    def test_type_check_only(self):
+        check = ValueChecker(do_raise=True)
+
+        @check.typecheck("b")
+        def foo(a: int, b: str, c: dict):
+            ...
+
+        foo(5, "something", {})
+        foo(5.0, "something", {})
+        with pytest.raises(ValueChecker.default_exception_type):
+            foo(1.0, 1, {})
+
+    def test_type_check_only_many(self):
+        check = ValueChecker(do_raise=True)
+
+        @check.typecheck("b", "c")
+        def foo(a: int, b: str, c: dict):
+            ...
+
+        foo(5, "something", {})
+        foo(5.0, "something", {})
+        with pytest.raises(ValueChecker.default_exception_type):
+            foo(1.0, 1, {})
+        with pytest.raises(ValueChecker.default_exception_type):
+            foo(1.0, "str", 1)
+
+    def test_type_check_only_many_wrappers(self):
+        check = ValueChecker(do_raise=True)
+
+        @check.typecheck("b")
+        @check.typecheck("c")
+        def foo(a: int, b: str, c: dict):
+            ...
+
+        foo(5, "something", {})
+        foo(5.0, "something", {})
+        with pytest.raises(ValueChecker.default_exception_type):
+            foo(1.0, 1, {})
+        with pytest.raises(ValueChecker.default_exception_type):
+            foo(1.0, "str", 1)

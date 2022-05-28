@@ -40,6 +40,16 @@ class TypeCheckWarning(Warning):
 
 
 # def get_inner_type(typ: ):
+class Null:
+    ...
+
+
+class _Nullable:
+    def __getitem__(self, item):
+        return Union[Type[Null], item]
+
+
+Nullable = _Nullable()
 
 
 def is_builtin_type(obj: Any):
@@ -107,10 +117,12 @@ def check_handler(
     @functools.wraps(f)
     def wrapped(self: ValueChecker, *args: P.args, **kwargs: P.kwargs) -> R:
         result = f(self, *args, **kwargs)
-        handle_kwargs = {
-            attr: kwargs.get(attr, getattr(self, attr))
-            for attr in ["do_raise", "exception_type", "do_warn", "warning_type"]
-        }
+        handle_kwargs = {}
+        for attr in ["do_raise", "exception_type", "do_warn", "warning_type"]:
+            if attr not in kwargs or kwargs[attr] is Null:
+                handle_kwargs[attr] = getattr(self, attr)
+            else:
+                handle_kwargs[attr] = kwargs[attr]
         return self._handle(result, **handle_kwargs)
 
     return wrapped
@@ -183,18 +195,13 @@ class ValueChecker:
         typ: Types,
         *,
         extra_err_msg: Optional[str] = None,
-        do_raise: bool = False,
-        exception_type: ExceptionType = default_exception_type,
-        do_warn: bool = False,
-        warning_type: WarningType = default_warning_type,
+        do_raise: Nullable[bool] = Null,
+        exception_type: Nullable[ExceptionType] = Null,
+        do_warn: Nullable[bool] = Null,
+        warning_type: Nullable[WarningType] = Null,
         _force_untrue: bool = False,
     ) -> ValidationResult:
-        _, _, _, _ = (
-            do_raise,
-            exception_type,
-            do_warn,
-            warning_type,
-        )  # purely to ignore linting errors
+        _, _, _, _ = do_raise, exception_type, do_warn, warning_type
         errmsg = ""
         valid = True
         if _force_untrue or not is_instance(obj, typ):
@@ -209,10 +216,10 @@ class ValueChecker:
         typ: Any,
         *,
         extra_err_msg: Optional[str] = None,
-        do_raise: bool = False,
-        exception_type: ExceptionType = default_exception_type,
-        do_warn: bool = False,
-        warning_type: WarningType = default_warning_type,
+        do_raise: Nullable[bool] = Null,
+        exception_type: Nullable[ExceptionType] = Null,
+        do_warn: Nullable[bool] = Null,
+        warning_type: Nullable[WarningType] = Null,
     ):
         kwargs = dict(
             extra_err_msg=extra_err_msg,
@@ -274,3 +281,31 @@ class ValueChecker:
             inner_result = self(inner_obj, inner_typ, **kwargs)
             result = result.combine(inner_result)
         return result
+
+    def typecheck(self, x: Union[str, Callable], *others: str) -> Callable:
+        if isinstance(x, str):
+            return functools.partial(self._typecheck, only=[x, *others])
+        else:
+            return self._typecheck(x)
+
+    def _typecheck(self, f: Callable, only=None) -> Callable:
+        signature: inspect.Signature = inspect.signature(f)
+        checker = self
+
+        @functools.wraps(f)
+        def wrapped(*args, **kwargs):
+            bound_args = signature.bind(*args, **kwargs)
+            for p in bound_args.signature.parameters.values():
+                if only and p.name not in only:
+                    continue
+                if p.annotation:
+                    pvalue = bound_args.arguments[p.name]
+                    checker(
+                        pvalue,
+                        p.annotation,
+                        extra_err_msg=f"Argument error for `{p}` for function `{f.__name__}` "
+                        f"(args: {bound_args.arguments})`.",
+                    )
+            return f(*args, **kwargs)
+
+        return wrapped
