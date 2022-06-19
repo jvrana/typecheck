@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import inspect
 import sys
+import types
 import typing
 import warnings
 from inspect import Parameter
@@ -141,6 +142,24 @@ def get_signature(obj: SignatureLike):
     return signature
 
 
+def reraise_outside_of_stack(exception: Exception):
+    try:
+        raise exception
+    except Exception:
+        traceback = sys.exc_info()[2]
+        tb_frame = traceback.tb_frame
+        back_frame = tb_frame
+        while back_frame.f_code.co_filename == __file__:
+            back_frame = back_frame.f_back
+    back_tb = types.TracebackType(
+        tb_next=None,
+        tb_frame=back_frame,
+        tb_lasti=back_frame.f_lasti,
+        tb_lineno=back_frame.f_lineno,
+    )
+    raise exception.with_traceback(back_tb)
+
+
 # TODO: add global config
 class ValueChecker:
     default_exception_type: ExceptionType = TypeCheckError
@@ -177,14 +196,16 @@ class ValueChecker:
         """
         if exception_type:
             if not issubclass(exception_type, Exception):
-                raise TypeError(
-                    f"Exception type must be an Exception. Found {type(exception_type)}"
+                reraise_outside_of_stack(
+                    TypeError(
+                        f"Exception type must be an Exception. Found {type(exception_type)}"
+                    )
                 )
         if is_instance(do_raise, bool):
             if do_raise is True and exception_type is None:
                 exception_type = TypeCheckError
         if do_raise and bool(x) is False:
-            raise exception_type(x.msg)
+            reraise_outside_of_stack(exception_type(x.msg))
         if do_warn and bool(x) is False:
             if warning_type is None:
                 w = x.msg

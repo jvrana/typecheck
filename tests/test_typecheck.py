@@ -5,9 +5,11 @@ import typing
 
 import pytest
 
+from typecheck._tests import fail_type_check
 from typecheck.check import is_builtin_inst
 from typecheck.check import is_builtin_type
 from typecheck.check import is_typing_type
+from typecheck.check import TypeCheckError
 from typecheck.check import ValidationResult
 from typecheck.check import ValueChecker
 
@@ -216,6 +218,17 @@ class TestValidators:
             == "TypeError on argument 'a'. Some extra message. Expected 5 to be a <class 'float'>, "
             "but found a <class 'int'> (5)"
         )
+
+
+def test_stack_trace():
+    with pytest.raises(TypeCheckError) as e:
+        fail_type_check()
+    expected_error = str(e.traceback[1])
+    assert (
+        expected_error
+        == "  File '/home/justin/Github/typecheck/typecheck/_tests.py':5 in fail_type_check"
+        "\n  validate_value(5.0, int)\n"
+    )
 
 
 class TestTypeCheckWrapper:
