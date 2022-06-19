@@ -157,7 +157,6 @@ def reraise_outside_of_stack(exception: Exception):
         tb_lasti=back_frame.f_lasti,
         tb_lineno=back_frame.f_lineno,
     )
-    raise exception
     raise exception.with_traceback(back_tb)
 
 
