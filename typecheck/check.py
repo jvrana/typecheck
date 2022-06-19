@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import inspect
 import sys
+import textwrap
 import types
 import typing
 import warnings
@@ -19,7 +20,6 @@ from typing import Tuple
 from typing import Type
 from typing import TypeVar
 from typing import Union
-
 
 if sys.version_info > (3.9,):
     from typing import ParamSpec, TypeAlias, Concatenate
@@ -116,6 +116,9 @@ class ValidationResult(NamedTuple):
         msg = "\n".join([self.msg, other.msg])
         return ValidationResult(valid, msg)
 
+    def wrapped_msg(self, width=70):
+        return "\n".join(textwrap.wrap(self.msg, width=70))
+
 
 def check_handler(
     f: Callable[Concatenate[ValueChecker, P], R]
@@ -205,12 +208,12 @@ class ValueChecker:
             if do_raise is True and exception_type is None:
                 exception_type = TypeCheckError
         if do_raise and bool(x) is False:
-            reraise_outside_of_stack(exception_type(x.msg))
+            reraise_outside_of_stack(exception_type(x.wrapped_msg()))
         if do_warn and bool(x) is False:
             if warning_type is None:
-                w = x.msg
+                w = x.wrapped_msg()
             else:
-                w = warning_type(x.msg)
+                w = warning_type(x.wrapped_msg())
             warnings.warn(w)
         return x
 
