@@ -157,6 +157,7 @@ def reraise_outside_of_stack(exception: Exception):
         tb_lasti=back_frame.f_lasti,
         tb_lineno=back_frame.f_lineno,
     )
+    raise exception
     raise exception.with_traceback(back_tb)
 
 
@@ -417,10 +418,11 @@ class ValueChecker:
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
             bound_args = signature.bind(*args, **kwargs)
-            for p in bound_args.signature.parameters.values():
+            params_list = list(bound_args.signature.parameters.values())
+            for p in params_list:
                 if only and p.name not in only:
                     continue
-                if p.annotation:
+                if p.annotation and p.annotation is not inspect._empty:
                     pvalue = bound_args.arguments[p.name]
                     checker(
                         pvalue,

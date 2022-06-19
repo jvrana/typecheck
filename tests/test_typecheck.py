@@ -254,6 +254,18 @@ class TestTypeCheckWrapper:
         with pytest.raises(ValueChecker.default_exception_type):
             foo(1.0, "", {})
 
+    def test_type_check_function(self):
+        check = ValueChecker(do_raise=True)
+
+        class Foo:
+            @check.validate_args
+            def foo(self, a: int, b: str, c: dict):
+                ...
+
+        Foo().foo(5, "str", {})
+        with pytest.raises(TypeCheckError):
+            Foo().foo(5, 5.0, {})
+
     def test_type_check_only(self):
         check = ValueChecker(do_raise=True)
 
