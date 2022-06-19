@@ -200,6 +200,23 @@ class TestValidators:
 
     # TODO: support TypedDict
 
+    def test_extra_msg(self):
+        check = ValueChecker()
+        result = check(5, float, extra_err_msg="Some extra message.")
+        assert (
+            result.msg == "Some extra message. Expected 5 to be a <class 'float'>, "
+            "but found a <class 'int'> (5)"
+        )
+
+    def test_arg_msg(self):
+        check = ValueChecker()
+        result = check(5, float, extra_err_msg="Some extra message.", arg="a")
+        assert (
+            result.msg
+            == "TypeError on argument 'a'. Some extra message. Expected 5 to be a <class 'float'>, "
+            "but found a <class 'int'> (5)"
+        )
+
 
 class TestTypeCheckWrapper:
     def test_type_check_simple(self):

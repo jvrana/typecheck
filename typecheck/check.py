@@ -251,11 +251,12 @@ class ValueChecker:
         return ValidationResult(True, "")
 
     @check_handler
-    def __call__(
+    def check(
         self,
         obj: Any,
         typ: Any,
         *,
+        arg: Optional[str] = None,
         extra_err_msg: Optional[str] = None,
         do_raise: Union[Type[Null], bool] = Null,
         exception_type: Union[Type[Null], ExceptionType] = Null,
@@ -309,7 +310,37 @@ class ValueChecker:
                             )
                 else:
                     return self.is_instance_of(obj, outer_typ, **kwargs)
+
+        if arg is not None:
+            extra_msgs = [f"TypeError on argument '{arg}'."]
+            if kwargs["extra_err_msg"]:
+                extra_msgs.append(kwargs["extra_err_msg"])
+            kwargs["extra_err_msg"] = " ".join(extra_msgs)
         return self.is_instance_of(obj, typ, **kwargs)
+
+    @check_handler
+    def __call__(
+        self,
+        obj: Any,
+        typ: Any,
+        *,
+        arg: Optional[str] = None,
+        extra_err_msg: Optional[str] = None,
+        do_raise: Union[Type[Null], bool] = Null,
+        exception_type: Union[Type[Null], ExceptionType] = Null,
+        do_warn: Union[Type[Null], bool] = Null,
+        warning_type: Union[Type[Null], WarningType] = Null,
+    ):
+        return self.check(
+            obj=obj,
+            typ=typ,
+            arg=arg,
+            extra_err_msg=extra_err_msg,
+            do_raise=do_raise,
+            exception_type=exception_type,
+            do_warn=do_warn,
+            warning_type=warning_type,
+        )
 
     def _check_inner_dict(self, result, obj, typ, kwargs):
         key_type, val_type = typ.__args__
