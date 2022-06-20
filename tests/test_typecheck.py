@@ -378,12 +378,22 @@ class TestCallableChecks:
         print(result.msg)
         assert bool(result)
 
-    def test_generator(self):
+    def test_generator_function(self):
         check = ValueChecker()
 
         T = typing.Callable[[int], typing.Generator[int, None, None]]
 
         def foo(a: int) -> typing.Generator[int, None, None]:
+            yield 5
+
+        assert bool(check(foo, T))
+
+    def test_generator_function_no_return_type(self):
+        check = ValueChecker()
+
+        T = typing.Callable[[int], typing.Generator[int, None, None]]
+
+        def foo(a: int):
             yield 5
 
         assert bool(check(foo, T))

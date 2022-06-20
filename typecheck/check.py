@@ -110,8 +110,12 @@ def is_instance(x: Any, types: Types) -> bool:
         return False
 
 
+def is_empty(x: Any):
+    return x is inspect._empty
+
+
 def is_subclass(x: Type, types: Types):
-    if x is types:
+    if x is types or is_empty(x):
         return True
     if not inspect.isclass(x):
         return False
@@ -535,7 +539,7 @@ class ValueChecker:
             for p in params_list:
                 if only and p.name not in only:
                     continue
-                if p.annotation and p.annotation is not inspect._empty:
+                if p.annotation and is_empty(p.annotation):
                     if p.name in bound_args.arguments:
                         pvalue = bound_args.arguments[p.name]
                         checker(
