@@ -388,6 +388,20 @@ class TestCallableChecks:
 
         assert bool(check(foo, T))
 
+    def test_is_generator_type(self):
+        T = typing.Generator[int, None, None]
+        assert is_subclass(T.__origin__, collections.abc.Generator)
+
+    def test_not_a_generator_function(self):
+        check = ValueChecker()
+
+        T = typing.Callable[[int], typing.Generator[int, None, None]]
+
+        def foo(a: int) -> typing.Generator[int, None, None]:
+            return 5
+
+        assert not bool(check(foo, T))
+
     def test_generator_function_no_return_type(self):
         check = ValueChecker()
 

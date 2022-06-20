@@ -123,6 +123,12 @@ def is_subclass(x: Type, types: Types):
         return issubclass(x, types)
 
 
+def is_generator_type(x: Any):
+    if is_typing_type(x):
+        if hasattr(x, "__origin__"):
+            return is_subclass(x.__origin__, collections.abc.Generator)
+
+
 class ValidationResult(NamedTuple):
     valid: bool
     msg: str
@@ -361,17 +367,23 @@ class ValueChecker:
                         if outer_typ is list:
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
-                                result = self._check_inner_list(result, obj, typ, {})
+                                result = self._check_inner_list(
+                                    result, obj, typ, kwargs
+                                )
                             return result
                         elif outer_typ is tuple:
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
-                                result = self._check_inner_tuple(result, obj, typ, {})
+                                result = self._check_inner_tuple(
+                                    result, obj, typ, kwargs
+                                )
                             return result
                         elif outer_typ is dict:
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
-                                result = self._check_inner_dict(result, obj, typ, {})
+                                result = self._check_inner_dict(
+                                    result, obj, typ, kwargs
+                                )
                             return result
                         elif outer_typ == typing.Union:
                             for inner_typ in typ.__args__:
@@ -491,6 +503,14 @@ class ValueChecker:
                     extra_err_msg="TypeError on return type. ",
                 )
                 result = result.combine(inner_result)
+
+            if is_generator_type(ret_annot) and not is_generator_function(obj):
+                result = result.combine(
+                    ValidationResult(
+                        valid=False,
+                        msg=f"Function is not a generator function ({obj}).",
+                    )
+                )
         if not result.valid:
             outer_result = ValidationResult(
                 valid=False, msg=f"'{signature}' does not match '{typ}'"
@@ -539,7 +559,7 @@ class ValueChecker:
             for p in params_list:
                 if only and p.name not in only:
                     continue
-                if p.annotation and is_empty(p.annotation):
+                if p.annotation and not is_empty(p.annotation):
                     if p.name in bound_args.arguments:
                         pvalue = bound_args.arguments[p.name]
                         checker(
