@@ -2,6 +2,7 @@
 #   You may use, distribute and modify this code under the terms of the MIT license.
 from __future__ import annotations
 
+import collections
 import functools
 import inspect
 import sys
@@ -35,6 +36,11 @@ SignatureLike = Union[Callable, Signature]
 
 ExceptionType: TypeAlias = TypeVar("ExceptionType", bound=Type[Exception])
 WarningType: TypeAlias = TypeVar("WarningType", bound=Type[Warning])
+
+
+class TypingType(typing.Protocol):
+    __args__: tuple
+    __origin__: typing.Any
 
 
 class TypeCheckError(Exception):
@@ -102,6 +108,15 @@ def is_instance(x: Any, types: Types) -> bool:
         return isinstance(x, types)
     except TypeError:
         return False
+
+
+def is_subclass(x: Type, types: Types):
+    if x is types:
+        return True
+    if not inspect.isclass(x):
+        return False
+    else:
+        return issubclass(x, types)
 
 
 class ValidationResult(NamedTuple):
@@ -225,6 +240,10 @@ class ValueChecker:
             err_msg = ""
         return err_msg + msg
 
+    @staticmethod
+    def _typ_is_callable(typ: Type):
+        return typ is typing.Callable or typ is collections.Callable
+
     @check_handler
     def is_instance_of(
         self,
@@ -241,8 +260,34 @@ class ValueChecker:
         _, _, _, _ = do_raise, exception_type, do_warn, warning_type
         errmsg = ""
         valid = True
-        if _force_untrue or not is_instance(obj, typ):
+        if typ is typing.Any:
+            pass  # do nothing
+        elif _force_untrue or not is_instance(obj, typ):
             errmsg = f"Expected {obj} to be a {typ}, but found a {type(obj)} ({obj})"
+            errmsg = self._create_error_msg(errmsg, extra_err_msg)
+            valid = False
+        return ValidationResult(valid, errmsg)
+
+    @check_handler
+    def is_subclass_of(
+        self,
+        obj: Any,
+        typ: Types,
+        *,
+        extra_err_msg: Optional[str] = None,
+        do_raise: Union[Type[Null], bool] = Null,
+        exception_type: Union[Type[Null], ExceptionType] = Null,
+        do_warn: Union[Type[Null], bool] = Null,
+        warning_type: Union[Type[Null], WarningType] = Null,
+        _force_untrue: bool = False,
+    ) -> ValidationResult:
+        _, _, _, _ = do_raise, exception_type, do_warn, warning_type
+        errmsg = ""
+        valid = True
+        if typ is typing.Any:
+            pass  # do nothing
+        elif _force_untrue or not is_subclass(obj, typ):
+            errmsg = f"Expected {obj} to be a subclass of {typ}."
             errmsg = self._create_error_msg(errmsg, extra_err_msg)
             valid = False
         return ValidationResult(valid, errmsg)
@@ -332,6 +377,14 @@ class ValueChecker:
                             return ValidationResult(
                                 False, f"Value {obj} did not pass {typ}"
                             )
+                        elif self._typ_is_callable(outer_typ):
+                            result = self.is_instance_of(obj, outer_typ, **kwargs)
+                            if result.valid:
+                                result = self._check_inner_callable(
+                                    result, obj, typ, kwargs
+                                )
+                            return result
+
                 else:
                     return self.is_instance_of(obj, outer_typ, **kwargs)
 
@@ -346,7 +399,7 @@ class ValueChecker:
     def __call__(
         self,
         obj: Any,
-        typ: Any,
+        typ: TypingType,
         *,
         arg: Optional[str] = None,
         extra_err_msg: Optional[str] = None,
@@ -366,7 +419,9 @@ class ValueChecker:
             warning_type=warning_type,
         )
 
-    def _check_inner_dict(self, result, obj, typ, kwargs):
+    def _check_inner_dict(
+        self, result, obj: typing.Dict, typ: TypingType, kwargs: dict
+    ):
         key_type, val_type = typ.__args__
         for k in obj:
             inner_result = self(k, key_type, **kwargs)
@@ -376,7 +431,7 @@ class ValueChecker:
             result = result.combine(inner_result)
         return result
 
-    def _check_inner_tuple(self, result, obj, typ, kwargs):
+    def _check_inner_tuple(self, result, obj: Tuple, typ: TypingType, kwargs: dict):
         use_same_inner_type = False
         inner_typ = typ.__args__[0]
         if len(typ.__args__) >= 2 and typ.__args__[1] is Ellipsis:
@@ -393,11 +448,49 @@ class ValueChecker:
             result = result.combine(inner_result)
         return result
 
-    def _check_inner_list(self, result, obj, typ, kwargs):
+    def _check_inner_list(self, result, obj: List, typ: TypingType, kwargs: dict):
         inner_typ = typ.__args__[0]
         for inner_obj in obj:
             inner_result = self(inner_obj, inner_typ, **kwargs)
             result = result.combine(inner_result)
+        return result
+
+    def _check_inner_callable(
+        self, result, obj: Callable, typ: TypingType, kwargs: dict
+    ):
+        if typ.__args__:
+            arg_annots = typ.__args__[:-1]
+            ret_annot = typ.__args__[-1]
+            signature = inspect.signature(obj)
+            signature_params = list(signature.parameters.values())
+            signature_ret = signature.return_annotation
+            if not len(signature_params) == len(arg_annots):
+                result = result.combine(
+                    ValidationResult(
+                        valid=False,
+                        msg=f"Expected {len(arg_annots)} arguments for "
+                        f"callable ({typ}), but found {len(signature_params)}",
+                    )
+                )
+            else:
+                for param, annot in zip(signature_params, arg_annots):
+                    inner_result = self.is_subclass_of(
+                        param.annotation,
+                        annot,
+                        extra_err_msg=f"TypeError on arg '{param}'. ",
+                    )
+                    result = result.combine(inner_result)
+                inner_result = self.is_subclass_of(
+                    signature_ret,
+                    ret_annot,
+                    extra_err_msg="TypeError on return type. ",
+                )
+                result = result.combine(inner_result)
+        if not result.valid:
+            outer_result = ValidationResult(
+                valid=False, msg=f"'{signature}' does not match '{typ}'"
+            )
+            result = outer_result.combine(result)
         return result
 
     def validate_signature(self, other: SignatureLike):

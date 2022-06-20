@@ -1,5 +1,6 @@
 #  Copyright (c) 2022. Justin Vrana - All Rights Reserved
 #   You may use, distribute and modify this code under the terms of the MIT license.
+import collections.abc
 import inspect
 import typing
 from enum import Enum
@@ -12,6 +13,7 @@ import typecheck
 from typecheck._tests import fail_type_check
 from typecheck.check import is_builtin_inst
 from typecheck.check import is_builtin_type
+from typecheck.check import is_subclass
 from typecheck.check import is_typing_type
 from typecheck.check import TypeCheckError
 from typecheck.check import ValidationResult
@@ -54,6 +56,28 @@ def test_is_typing_type(x):
 @pytest.mark.parametrize("x", [5, (1,), 5.0, "string"], ids=lambda x: str(x))
 def test_is_not_typing_type(x):
     assert not is_typing_type(x)
+
+
+def test_is_subclass():
+    class Foo(typing.List):
+        ...
+
+    class Bar(Foo):
+        ...
+
+    assert is_subclass(typing.List, typing.List)
+    assert not is_subclass(5, typing.List)
+    assert issubclass(Bar, Foo)
+    assert is_subclass(Bar, Foo)
+    assert is_subclass(Bar, typing.List)
+    assert is_subclass(Foo, typing.List)
+    assert not is_subclass(Foo, typing.Dict)
+    assert not is_subclass(
+        typing.List, typing.Sequence
+    ), "List is not a direct subclass of Sequence"
+    assert is_subclass(
+        typing.List.__origin__, typing.Sequence
+    ), "list IS a direct subclass of Sequence"
 
 
 def empty_generator():
@@ -222,6 +246,108 @@ class TestValidators:
             == "TypeError on argument 'a'. Some extra message. Expected 5 to be a <class 'float'>, "
             "but found a <class 'int'> (5)"
         )
+
+    @pytest.mark.parametrize("value", [5, "str", {}, []])
+    def test_validate_any(self, value):
+        check = ValueChecker()
+        result = check(value, typing.Any)
+        assert bool(result)
+
+    @pytest.mark.parametrize("value", [5, "str", {}, []])
+    def test_validate_union_any(self, value):
+        check = ValueChecker()
+
+        class Foo:
+            ...
+
+        result = check(value, typing.Union[Foo, typing.Any])
+        assert bool(result)
+
+
+class TestCallableChecks:
+    @pytest.mark.parametrize(
+        "typ", [typing.Callable[[int, float], typing.Any], typing.Callable]
+    )
+    def test_callable_passes(self, typ):
+        check = ValueChecker()
+
+        def foo(a: int, b: float) -> typing.Any:
+            ...
+
+        assert bool(check(foo, typ))
+
+    def test_any_annotation(self):
+        check = ValueChecker()
+
+        def foo(a: int, b: float) -> typing.Any:
+            ...
+
+        def bar(a: str, b: list) -> dict:
+            ...
+
+        assert check(foo, typing.Callable[[typing.Any, typing.Any], typing.Any])
+        assert check(bar, typing.Callable[[typing.Any, typing.Any], typing.Any])
+
+    def test_any_annotation2(self):
+        check = ValueChecker()
+
+        def foo(a: typing.Any, b: float) -> dict:
+            ...
+
+        assert not check(foo, typing.Callable[[int, float], dict])
+
+    def test_wrong_return_type(self):
+        check = ValueChecker()
+
+        def foo(a: int, b: float) -> float:
+            ...
+
+        assert bool(check(foo, typing.Callable))
+        result = check(foo, typing.Callable[[int, float], typing.Any])
+        print(result.msg)
+        assert bool(result)
+        assert bool(check(foo, typing.Callable[[int, float], float]))
+        assert not bool(check(foo, typing.Callable[[int, float], int]))
+
+    @pytest.mark.parametrize(
+        "typ", [typing.Callable[[int, float], typing.Any], typing.Callable]
+    )
+    def test_not_a_callable(self, typ):
+        check = ValueChecker()
+        result = check(5, typ)
+        assert bool(result) is False
+
+    def test_callable_wrong_num_args(self):
+        check = ValueChecker()
+        Fn = typing.Callable[[int, float], typing.Any]
+
+        def foo(a: int, b: float, c: float) -> typing.Any:
+            ...
+
+        result = check(foo, Fn)
+        assert not bool(result)
+
+    def test_wrong_type(self):
+        check = ValueChecker()
+        Fn = typing.Callable[[int, float], typing.Any]
+
+        def foo(a: float, b: float) -> typing.Any:
+            ...
+
+        result = check(foo, Fn)
+        print(result.msg)
+        assert not bool(result)
+
+    def test_callable_class(self):
+        check = ValueChecker()
+
+        class Foo(typing.Callable[[int, float], str]):
+            def __call__(self, a: int, b: float) -> str:
+                ...
+
+        result = check(Foo(), typing.Callable[[int, float], str])
+        print(result.msg)
+        assert bool(result)
 
 
 def test_stack_trace():
