@@ -277,7 +277,7 @@ class ValueChecker:
         return ValidationResult(valid, errmsg)
 
     @check_handler
-    def is_subclass_of(
+    def is_type_of(
         self,
         obj: Any,
         typ: Types,
@@ -357,23 +357,17 @@ class ValueChecker:
                         if outer_typ is list:
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
-                                result = self._check_inner_list(
-                                    result, obj, typ, kwargs
-                                )
+                                result = self._check_inner_list(result, obj, typ, {})
                             return result
                         elif outer_typ is tuple:
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
-                                result = self._check_inner_tuple(
-                                    result, obj, typ, kwargs
-                                )
+                                result = self._check_inner_tuple(result, obj, typ, {})
                             return result
                         elif outer_typ is dict:
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
-                                result = self._check_inner_dict(
-                                    result, obj, typ, kwargs
-                                )
+                                result = self._check_inner_dict(result, obj, typ, {})
                             return result
                         elif outer_typ == typing.Union:
                             for inner_typ in typ.__args__:
@@ -388,33 +382,14 @@ class ValueChecker:
                         elif self._typ_is_callable(outer_typ):
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
-                                result = self._check_inner_callable(
-                                    result, obj, typ, kwargs
-                                )
+                                result = self._check_inner_callable(result, obj, typ)
                             return result
                 else:
                     return self.is_instance_of(obj, outer_typ, **kwargs)
             elif self._typ_is_typeddict(typ):
                 result = self.is_instance_of(obj, dict, **kwargs)
-                annotations = typ.__annotations__
                 if result.valid:
-                    for k, annot in annotations.items():
-                        if k not in obj:
-                            result = result.combine(
-                                ValidationResult(
-                                    valid=False,
-                                    msg=f"Key '{k}' missing on TypedDict {typ}. "
-                                    f"Expected keys {list(annotations.keys())}",
-                                )
-                            )
-                        else:
-                            result = result.combine(
-                                self.check(
-                                    obj[k],
-                                    annot,
-                                    extra_err_msg=f"TypeError on key '{k}'.",
-                                )
-                            )
+                    result = self._check_inner_typed_dict(result, obj, typ)
                 return result
         if arg is not None:
             extra_msgs = [f"TypeError on argument '{arg}'."]
@@ -483,9 +458,7 @@ class ValueChecker:
             result = result.combine(inner_result)
         return result
 
-    def _check_inner_callable(
-        self, result, obj: Callable, typ: TypingType, kwargs: dict
-    ):
+    def _check_inner_callable(self, result, obj: Callable, typ: TypingType):
         if typ.__args__:
             arg_annots = typ.__args__[:-1]
             ret_annot = typ.__args__[-1]
@@ -502,13 +475,13 @@ class ValueChecker:
                 )
             else:
                 for param, annot in zip(signature_params, arg_annots):
-                    inner_result = self.is_subclass_of(
+                    inner_result = self.is_type_of(
                         param.annotation,
                         annot,
                         extra_err_msg=f"TypeError on arg '{param}'. ",
                     )
                     result = result.combine(inner_result)
-                inner_result = self.is_subclass_of(
+                inner_result = self.is_type_of(
                     signature_ret,
                     ret_annot,
                     extra_err_msg="TypeError on return type. ",
@@ -519,6 +492,23 @@ class ValueChecker:
                 valid=False, msg=f"'{signature}' does not match '{typ}'"
             )
             result = outer_result.combine(result)
+        return result
+
+    def _check_inner_typed_dict(self, result, obj: Callable, typ: TypingType):
+        annotations = typ.__annotations__
+        for k, annot in annotations.items():
+            if k not in obj:
+                result = result.combine(
+                    ValidationResult(
+                        valid=False,
+                        msg=f"Key '{k}' missing on TypedDict {typ}. "
+                        f"Expected keys {list(annotations.keys())}",
+                    )
+                )
+            else:
+                result = result.combine(
+                    self.check(obj[k], annot, extra_err_msg=f"TypeError on key '{k}'.")
+                )
         return result
 
     def validate_signature(self, other: SignatureLike):

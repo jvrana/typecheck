@@ -378,6 +378,22 @@ class TestCallableChecks:
         print(result.msg)
         assert bool(result)
 
+    def test_generator(self):
+        check = ValueChecker()
+
+        T = typing.Callable[[int], typing.Generator[int, None, None]]
+
+        def foo(a: int) -> typing.Generator[int, None, None]:
+            yield 5
+
+        assert bool(check(foo, T))
+
+    def test_generator2(self):
+        check = ValueChecker()
+        assert check.is_type_of(
+            typing.Generator[int, None, None], typing.Generator[int, None, None]
+        )
+
 
 def test_stack_trace():
     with pytest.raises(TypeCheckError) as e:
