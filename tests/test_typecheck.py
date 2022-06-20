@@ -11,6 +11,7 @@ import pytest
 
 import typecheck
 from typecheck._tests import fail_type_check
+from typecheck._tests import for_readable_error_on_function
 from typecheck.check import is_builtin_inst
 from typecheck.check import is_builtin_type
 from typecheck.check import is_subclass
@@ -234,17 +235,16 @@ class TestValidators:
         check = ValueChecker()
         result = check(5, float, extra_err_msg="Some extra message.")
         assert (
-            result.msg == "Some extra message. Expected 5 to be a <class 'float'>, "
-            "but found a <class 'int'> (5)"
+            result.msg
+            == "Some extra message. \nExpected <class 'int'> '5' to be a <class 'float'>."
         )
 
     def test_arg_msg(self):
         check = ValueChecker()
         result = check(5, float, extra_err_msg="Some extra message.", arg="a")
         assert (
-            result.msg
-            == "TypeError on argument 'a'. Some extra message. Expected 5 to be a <class 'float'>, "
-            "but found a <class 'int'> (5)"
+            result.msg == "TypeError on argument 'a'. Some extra message. \n"
+            "Expected <class 'int'> '5' to be a <class 'float'>."
         )
 
     @pytest.mark.parametrize("value", [5, "str", {}, []])
@@ -287,8 +287,7 @@ class TestValidators:
         print(result.msg)
         assert (
             result.msg
-            == "TypeError on key 'y'. Expected 2.0 to be a <class 'int'>, but found a "
-            "<class 'float'> (2.0)"
+            == "TypeError on key 'y'. \nExpected <class 'float'> '2.0' to be a <class 'int'>."
         )
         assert not bool(result)
 
@@ -557,3 +556,9 @@ class TestExamples:
             Event(EventType.Type1, 1)
         with pytest.raises(TypeCheckError):
             Event(EventType.Type1, "step_key", 1)
+
+    def test_for_readable_error_on_function(self):
+        with pytest.raises(Exception) as e:
+            for_readable_error_on_function("str")
+        for tb in e.traceback:
+            print(tb)

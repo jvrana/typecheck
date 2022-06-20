@@ -174,15 +174,23 @@ def get_signature(obj: SignatureLike):
     return signature
 
 
+def get_back_frame(
+    frame: Optional[types.FrameType] = None, ignore_files=(__file__,)
+) -> types.FrameType:
+    if frame is None:
+        frame = inspect.currentframe()
+    while frame.f_code.co_filename in ignore_files:
+        frame = frame.f_back
+    return frame
+
+
 def reraise_outside_of_stack(exception: Exception):
     try:
         raise exception
     except Exception:
         traceback = sys.exc_info()[2]
         tb_frame = traceback.tb_frame
-        back_frame = tb_frame
-        while back_frame.f_code.co_filename == __file__:
-            back_frame = back_frame.f_back
+        back_frame = get_back_frame(tb_frame)
     back_tb = types.TracebackType(
         tb_next=None,
         tb_frame=back_frame,
@@ -252,7 +260,7 @@ class ValueChecker:
             err_msg = extra_msg + " "
         else:
             err_msg = ""
-        return err_msg + msg
+        return "\n".join([err_msg, msg])
 
     @staticmethod
     def _typ_is_callable(typ: Type):
@@ -281,7 +289,7 @@ class ValueChecker:
         if typ is typing.Any:
             pass  # do nothing
         elif _force_untrue or not is_instance(obj, typ):
-            errmsg = f"Expected {obj} to be a {typ}, but found a {type(obj)} ({obj})"
+            errmsg = f"Expected {type(obj)} '{obj}' to be a {typ}."
             errmsg = self._create_error_msg(errmsg, extra_err_msg)
             valid = False
         return ValidationResult(valid, errmsg)
@@ -551,6 +559,8 @@ class ValueChecker:
     def _validate_args(self, f: Callable, only=None) -> Callable:
         signature: inspect.Signature = inspect.signature(f)
         checker = self
+        frame = get_back_frame()
+        frameinfo = inspect.getframeinfo(frame)
 
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
@@ -560,14 +570,13 @@ class ValueChecker:
                 if only and p.name not in only:
                     continue
                 if p.annotation and not is_empty(p.annotation):
+                    msg = (
+                        f"Argument error for `{p}` for function `{f.__name__}` "
+                        f"({frameinfo.filename}:{frameinfo.lineno})"
+                    )
                     if p.name in bound_args.arguments:
                         pvalue = bound_args.arguments[p.name]
-                        checker(
-                            pvalue,
-                            p.annotation,
-                            extra_err_msg=f"Argument error for `{p}` for function `{f.__name__}` "
-                            f"(args: {bound_args.arguments})`.",
-                        )
+                        checker(pvalue, p.annotation, extra_err_msg=msg)
             return f(*args, **kwargs)
 
         return wrapped
