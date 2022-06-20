@@ -263,6 +263,35 @@ class TestValidators:
         result = check(value, typing.Union[Foo, typing.Any])
         assert bool(result)
 
+    def test_typed_dict(self):
+        check = ValueChecker()
+
+        Point2D = typing.TypedDict("Point2D", x=int, y=int, label=str)
+
+        data = {"x": 1, "y": 2, "label": "mylabel"}
+        result = check(data, Point2D)
+        assert bool(result)
+
+        data = {"x": 1, "label": "mylabel"}
+        result = check(data, Point2D)
+        print(result.msg)
+        assert (
+            result.msg
+            == "Key 'y' missing on TypedDict <class 'test_typecheck.Point2D'>. "
+            "Expected keys ['x', 'y', 'label']"
+        )
+        assert not bool(result)
+
+        data = {"x": 1, "y": 2.0, "label": "mylabel"}
+        result = check(data, Point2D)
+        print(result.msg)
+        assert (
+            result.msg
+            == "TypeError on key 'y'. Expected 2.0 to be a <class 'int'>, but found a "
+            "<class 'float'> (2.0)"
+        )
+        assert not bool(result)
+
 
 class TestCallableChecks:
     @pytest.mark.parametrize(

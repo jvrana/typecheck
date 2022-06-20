@@ -128,7 +128,11 @@ class ValidationResult(NamedTuple):
 
     def combine(self, other: ValidationResult) -> ValidationResult:
         valid = all([self.valid, other.valid])
-        msg = "\n".join([self.msg, other.msg])
+        if not other.valid:
+            msg = "\n".join([self.msg, other.msg])
+        else:
+            msg = self.msg
+        msg = msg.strip("\n").strip()
         return ValidationResult(valid, msg)
 
     def wrapped_msg(self, width=70):
@@ -243,6 +247,10 @@ class ValueChecker:
     @staticmethod
     def _typ_is_callable(typ: Type):
         return typ is typing.Callable or typ is collections.Callable
+
+    @staticmethod
+    def _typ_is_typeddict(typ: Type):
+        return isinstance(typ, typing._TypedDictMeta)
 
     @check_handler
     def is_instance_of(
@@ -384,10 +392,30 @@ class ValueChecker:
                                     result, obj, typ, kwargs
                                 )
                             return result
-
                 else:
                     return self.is_instance_of(obj, outer_typ, **kwargs)
-
+            elif self._typ_is_typeddict(typ):
+                result = self.is_instance_of(obj, dict, **kwargs)
+                annotations = typ.__annotations__
+                if result.valid:
+                    for k, annot in annotations.items():
+                        if k not in obj:
+                            result = result.combine(
+                                ValidationResult(
+                                    valid=False,
+                                    msg=f"Key '{k}' missing on TypedDict {typ}. "
+                                    f"Expected keys {list(annotations.keys())}",
+                                )
+                            )
+                        else:
+                            result = result.combine(
+                                self.check(
+                                    obj[k],
+                                    annot,
+                                    extra_err_msg=f"TypeError on key '{k}'.",
+                                )
+                            )
+                return result
         if arg is not None:
             extra_msgs = [f"TypeError on argument '{arg}'."]
             if kwargs["extra_err_msg"]:
