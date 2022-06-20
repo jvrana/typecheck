@@ -2,9 +2,13 @@
 #   You may use, distribute and modify this code under the terms of the MIT license.
 import inspect
 import typing
+from enum import Enum
+from typing import NamedTuple
+from typing import Optional
 
 import pytest
 
+import typecheck
 from typecheck._tests import fail_type_check
 from typecheck.check import is_builtin_inst
 from typecheck.check import is_builtin_type
@@ -321,3 +325,40 @@ class TestTypeCheckWrapper:
             [([1], "str")], typing.List[typing.Tuple[typing.List[float], str]]
         )
         assert not bool(result)
+
+
+class TestExamples:
+    def test_with_named_tuple(self):
+        class EventType(Enum):
+            Type1 = "Type1"
+
+        class Event(
+            NamedTuple(
+                "Event",
+                [
+                    ("event_type", EventType),
+                    ("step_key", Optional[str]),
+                    ("metadata", Optional[dict]),
+                ],
+            )
+        ):
+            ...
+
+            @typecheck.validate_args
+            def __new__(
+                cls,
+                event_type: EventType,
+                step_key: Optional[str] = None,
+                metadata: typing.Optional[dict] = None,
+            ):
+                super().__new__(cls, event_type, step_key, metadata)
+
+        Event(EventType.Type1)
+        Event(EventType.Type1, "step_key")
+        Event(EventType.Type1, "step_key", {})
+        with pytest.raises(TypeCheckError):
+            Event(EventType.Type1, {})
+        with pytest.raises(TypeCheckError):
+            Event(EventType.Type1, 1)
+        with pytest.raises(TypeCheckError):
+            Event(EventType.Type1, "step_key", 1)

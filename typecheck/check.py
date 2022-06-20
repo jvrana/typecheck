@@ -425,13 +425,14 @@ class ValueChecker:
                 if only and p.name not in only:
                     continue
                 if p.annotation and p.annotation is not inspect._empty:
-                    pvalue = bound_args.arguments[p.name]
-                    checker(
-                        pvalue,
-                        p.annotation,
-                        extra_err_msg=f"Argument error for `{p}` for function `{f.__name__}` "
-                        f"(args: {bound_args.arguments})`.",
-                    )
+                    if p.name in bound_args.arguments:
+                        pvalue = bound_args.arguments[p.name]
+                        checker(
+                            pvalue,
+                            p.annotation,
+                            extra_err_msg=f"Argument error for `{p}` for function `{f.__name__}` "
+                            f"(args: {bound_args.arguments})`.",
+                        )
             return f(*args, **kwargs)
 
         return wrapped
