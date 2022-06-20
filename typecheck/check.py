@@ -145,8 +145,8 @@ class ValidationResult(NamedTuple):
         msg = msg.strip("\n").strip()
         return ValidationResult(valid, msg)
 
-    def wrapped_msg(self, width=70):
-        return "\n".join(textwrap.wrap(self.msg, width=70))
+    def wrapped_msg(self, width=250):
+        return "\n".join(textwrap.wrap(self.msg, width=width))
 
 
 def check_handler(
