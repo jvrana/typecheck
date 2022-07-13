@@ -104,6 +104,12 @@ def is_any(x: Any, types: List[Any]) -> bool:
 
 
 def is_instance(x: Any, types: Types) -> bool:
+    """Returns True if x is an instance of the provided types.
+
+    :param x:
+    :param types:
+    :return:
+    """
     try:
         return isinstance(x, types)
     except TypeError:
@@ -111,6 +117,11 @@ def is_instance(x: Any, types: Types) -> bool:
 
 
 def is_empty(x: Any):
+    """Check if value is an empty type (i.e. inspect._empty).
+
+    This is the default value for annotation of an argument with no
+    annotation
+    """
     return x is inspect._empty
 
 

@@ -387,6 +387,23 @@ class TestCallableChecks:
 
         assert bool(check(foo, T))
 
+    def test_wrapper_with_generator_function(self):
+        check = ValueChecker(do_raise=True)
+
+        class Foo:
+            ...
+
+        T = typing.Callable[[int], typing.Generator[Foo, None, None]]
+
+        @check.validate_args
+        def wrapper(fn: T):
+            ...
+
+        def foo(a: int) -> typing.Generator[Foo, None, None]:
+            yield 5
+
+        wrapper(foo)
+
     def test_is_generator_type(self):
         T = typing.Generator[int, None, None]
         assert is_subclass(T.__origin__, collections.abc.Generator)
@@ -422,11 +439,7 @@ def test_stack_trace():
     with pytest.raises(TypeCheckError) as e:
         fail_type_check()
     expected_error = str(e.traceback[1])
-    assert (
-        expected_error
-        == "  File '/home/justin/Github/typecheck/typecheck/_tests.py':5 in fail_type_check"
-        "\n  validate_value(5.0, int)\n"
-    )
+    assert "validate_value(5.0, int)" in expected_error
 
 
 class TestTypeCheckWrapper:
