@@ -10,7 +10,6 @@ import textwrap
 import types
 import typing
 import warnings
-from inspect import Parameter
 from inspect import Signature
 from typing import Any
 from typing import Callable

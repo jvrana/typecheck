@@ -9,16 +9,16 @@ from typing import Optional
 
 import pytest
 
-import typecheck
-from typecheck._tests import fail_type_check
-from typecheck._tests import for_readable_error_on_function
-from typecheck.check import is_builtin_inst
-from typecheck.check import is_builtin_type
-from typecheck.check import is_subclass
-from typecheck.check import is_typing_type
-from typecheck.check import TypeCheckError
-from typecheck.check import ValidationResult
-from typecheck.check import ValueChecker
+import jdv_typecheck
+from jdv_typecheck._tests import fail_type_check
+from jdv_typecheck._tests import for_readable_error_on_function
+from jdv_typecheck.check import is_builtin_inst
+from jdv_typecheck.check import is_builtin_type
+from jdv_typecheck.check import is_subclass
+from jdv_typecheck.check import is_typing_type
+from jdv_typecheck.check import TypeCheckError
+from jdv_typecheck.check import ValidationResult
+from jdv_typecheck.check import ValueChecker
 
 
 class Foo:
@@ -551,7 +551,7 @@ class TestExamples:
         ):
             ...
 
-            @typecheck.validate_args
+            @jdv_typecheck.validate_args
             def __new__(
                 cls,
                 event_type: EventType,

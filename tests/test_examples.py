@@ -6,10 +6,10 @@ from typing import Union
 
 import pytest
 
-from typecheck import TypeCheckError
-from typecheck import validate_args
-from typecheck import validate_signature
-from typecheck import validate_value
+from jdv_typecheck import TypeCheckError
+from jdv_typecheck import validate_args
+from jdv_typecheck import validate_signature
+from jdv_typecheck import validate_value
 
 
 def test_validate_args():
