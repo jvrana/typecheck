@@ -192,6 +192,29 @@ class TestValidators:
         result = bool(check(inst, typ))
         assert result is valid
 
+    # TODO: support for comparing types, and functions
+    # def test_generator_function(self,):
+    #     check = ValueChecker()
+    #
+    #     def inst() -> typing.Generator[int, None, None]:
+    #         yield 1
+    #         return
+    #
+    #     assert bool(check(inst, typing.Callable))
+    #     assert bool(check(inst, typing.Callable[[], typing.Generator]))
+    #     assert bool(check(inst, typing.Callable[[], typing.Generator[int, None, None]]))
+    #     assert not bool(check(inst, typing.Callable[[], typing.Generator[str, None, None]]))
+    #
+    # def test_ret_annot_sequence(self,):
+    #     check = ValueChecker()
+    #
+    #     def inst() -> typing.List[int]:
+    #         return
+    #
+    #     assert bool(check(inst, typing.Callable))
+    #     assert bool(check(inst, typing.Callable[[], typing.List]))
+    #     assert bool(check(inst, typing.Callable[[], typing.List[int]]))
+
     @pytest.mark.parametrize(
         "inst,typ,valid",
         [
@@ -294,7 +317,9 @@ class TestValidators:
 
 class TestCallableChecks:
     @pytest.mark.parametrize(
-        "typ", [typing.Callable[[int, float], typing.Any], typing.Callable]
+        "typ",
+        [typing.Callable[[int, float], typing.Any], typing.Callable],
+        ids=lambda x: str(x),
     )
     def test_callable_passes(self, typ):
         check = ValueChecker()

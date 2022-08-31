@@ -274,7 +274,7 @@ class ValueChecker:
 
     @staticmethod
     def _typ_is_callable(typ: Type):
-        return typ is typing.Callable or typ is collections.Callable
+        return typ is typing.Callable or isinstance(typ, typing.Callable)
 
     @staticmethod
     def _typ_is_typeddict(typ: Type):
@@ -413,6 +413,8 @@ class ValueChecker:
                             return ValidationResult(
                                 False, f"Value {obj} did not pass {typ}"
                             )
+                        elif outer_typ == collections.abc.Generator:
+                            return inspect.isgenerator(obj)
                         elif self._typ_is_callable(outer_typ):
                             result = self.is_instance_of(obj, outer_typ, **kwargs)
                             if result.valid:
